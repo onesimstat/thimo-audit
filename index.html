@@ -148,13 +148,18 @@
 <script>
 const API_URL = "https://kobo-relay.onrender.com/submit";
 const PHOTOS_BASE = "https://onesimstat.github.io/thimo-audit/photos/";
-const BENEFICIAIRES = {
-  "781437557": { nom: "TRAORE", prenoms: "Issiaka", prestataire: "PFS CI", commune: "Port-Bouët", telephone: "0508616268" },
-  "786240723": { nom: "KONE", prenoms: "Aminata", prestataire: "PFS CI", commune: "Cocody", telephone: "0700000001" },
-  "780111355": { nom: "BAH", prenoms: "Gouhe Théophile", prestataire: "PFS CI", commune: "Abobo", telephone: "0700000002" },
-  "774521714": { nom: "Kouadio", prenoms: "Akissi Eliane", prestataire: "PFS CI", commune: "Yopougon", telephone: "0700000003" },
-  "777760751": { nom: "Kouassi", prenoms: "Jean", prestataire: "PFS CI", commune: "Marcory", telephone: "0700000004" },
-};
+let BENEFICIAIRES = {};
+async function loadBeneficiaires() {
+  try {
+    const response = await fetch('beneficiaires.json');
+    BENEFICIAIRES = await response.json();
+    console.log('✅ ' + Object.keys(BENEFICIAIRES).length + ' bénéficiaires chargés');
+  } catch (err) {
+    console.error('Erreur chargement:', err);
+    alert('Impossible de charger la liste des bénéficiaires.');
+  }
+}
+loadBeneficiaires();
 let benefCount = 0;
 function getGPS() {
   if (!navigator.geolocation) { alert("Géolocalisation non supportée"); return; }
@@ -256,6 +261,12 @@ function lookupBenef(id) {
   const photosDiv = document.getElementById("photos_" + id);
   const questionsDiv = document.getElementById("questions_" + id);
   if (!idBenef) { infoDiv.style.display = "none"; questionsDiv.style.display = "none"; return; }
+  if (Object.keys(BENEFICIAIRES).length === 0) {
+    infoContent.innerHTML = '<span style=\'color:#f9a825;font-weight:700;\'>⏳ Chargement en cours...</span>';
+    infoDiv.style.display = 'block';
+    questionsDiv.style.display = 'none';
+    return;
+  }
   const benef = BENEFICIAIRES[idBenef];
   if (!benef) {
     infoContent.innerHTML = '<span style="color:#E97132;font-weight:700;">⚠️ Identifiant introuvable</span>';
