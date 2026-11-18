@@ -32,13 +32,19 @@
   .success-box p { color: #555; font-size: 14px; line-height: 1.7; }
   .footer { text-align: center; margin-top: 22px; font-size: 11.5px; color: #999; }
   .photo-ref { display: inline-block; margin: 8px 8px 8px 0; text-align: center; }
-  .photo-ref img { max-width: 180px; max-height: 180px; border-radius: 8px; border: 2px solid #dde8e4; }
+  .photo-ref img { max-width: 180px; max-height: 180px; border-radius: 8px; border: 2px solid #dde8e4; cursor: zoom-in; }
   .photo-ref .caption { font-size: 11px; color: #666; margin-top: 4px; }
   .benef-block { background: #f8fbfa; border: 2px solid #dde8e4; border-radius: 8px; padding: 18px; margin-bottom: 16px; position: relative; }
-  .benef-block .remove-btn { position: absolute; top: 8px; right: 8px; background: #E97132; color: white; border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-weight: 700; }
-  .add-btn { background: #4EA72E; color: white; border: none; border-radius: 8px; padding: 10px 18px; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 16px; }
-  .add-btn:hover { background: #3d8a22; }
-  .empty-msg { background: #fff8e1; border-left: 4px solid #f9a825; padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: 13px; color: #665500; margin-bottom: 16px; }
+
+  .image-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; }
+  .image-modal.active { display: flex; }
+  .image-modal .modal-content { max-width: 90vw; max-height: 80vh; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+  .image-modal img { max-width: 90vw; max-height: 75vh; transition: transform 0.2s ease; transform-origin: center center; border-radius: 8px; }
+  .image-modal .controls { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+  .image-modal .controls button { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 10px 16px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .image-modal .controls button:hover { background: rgba(255,255,255,0.3); }
+  .image-modal .close-btn { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 50%; width: 44px; height: 44px; font-size: 24px; cursor: pointer; font-weight: 700; }
+  .caption-modal { color: white; margin-top: 8px; font-size: 14px; opacity: 0.8; }
 </style>
 </head>
 <body>
@@ -48,6 +54,7 @@
     <h1>Formulaire de <span>vérification terrain</span></h1>
   </div>
   <div class="card" id="formCard">
+
     <div class="section-title">1. Contexte de la visite</div>
     <div class="grid-2">
       <div class="form-group">
@@ -127,27 +134,103 @@
       <div class="form-group">
         <label>GPS du site</label>
         <button type="button" onclick="getGPS()" style="padding:8px 14px;background:#0EA695;color:white;border:none;border-radius:6px;cursor:pointer;font-family:inherit;">📍 Obtenir GPS</button>
-        <input type="text" id="gps" readonly style="margin-top:8px;" />
+        <input type="text" id="gps_site" readonly style="margin-top:8px;" />
       </div>
     </div>
-    <div class="section-title" id="benef_section" style="display:none;">2. Bénéficiaires contrôlés</div>
-    <div class="empty-msg" id="empty_benef_msg" style="display:none;">Aucun bénéficiaire ajouté. Cliquez sur le bouton ci-dessous.</div>
-    <div id="beneficiaires_container"></div>
-    <button type="button" class="add-btn" id="add_benef_btn" style="display:none;" onclick="addBeneficiaire()">+ Ajouter un bénéficiaire</button>
+
+    <div class="section-title" id="benef_section" style="display:none;">2. Bénéficiaire contrôlé</div>
+    <div class="benef-block" id="benef_block" style="display:none;">
+      <div class="form-group">
+        <label>Identifiant du bénéficiaire <span class="req">*</span></label>
+        <input type="text" id="id_benef" placeholder="Ex: 781437557" oninput="lookupBenef()" required />
+      </div>
+      <div id="info_benef" style="display:none;background:white;padding:12px;border-radius:6px;margin-bottom:12px;font-size:13px;line-height:1.6;">
+        <div id="info_content"></div>
+        <div id="photos_container" style="margin-top:12px;text-align:center;"></div>
+      </div>
+      <div id="questions_benef" style="display:none;">
+        <div class="form-group">
+          <label>Statut de présence <span class="req">*</span></label>
+          <select id="statut_presence" required>
+            <option value="">-- Sélectionnez --</option>
+            <option value="P1">P1 – Présent et identité confirmée</option>
+            <option value="P2">P2 – Absent non justifié</option>
+            <option value="P3">P3 – Non retrouvé / Inconnu</option>
+            <option value="P4">P4 – Contrôle impossible</option>
+            <option value="P5">P5 – Site non concordant / Rotation</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Anomalies constatées <span class="req">*</span></label>
+          <select id="codes_anomalies" multiple size="6" required style="height:auto;">
+            <option value="A1">A1 – Absence non justifiée</option>
+            <option value="A2">A2 – Identité non concordante</option>
+            <option value="A3">A3 – Bénéficiaire fictif</option>
+            <option value="A4">A4 – Brigade non concordante</option>
+            <option value="A6">A6 – Activité non observée</option>
+            <option value="A7">A7 – Doublon</option>
+            <option value="A8">A8 – Autre anomalie</option>
+          </select>
+          <span class="hint">Maintenez Ctrl pour sélectionner plusieurs</span>
+        </div>
+        <div class="form-group">
+          <label>Précisions sur l'anomalie (si A8 ou A2)</label>
+          <input type="text" id="detail_anomalie" />
+        </div>
+        <div class="form-group">
+          <label>Face-Matching <span class="req">*</span></label>
+          <select id="face_match_result" required>
+            <option value="">-- Sélectionnez --</option>
+            <option value="conforme">Conforme – Identité confirmée</option>
+            <option value="douteux">Douteux – Nécessite vérification</option>
+            <option value="usurpation">Non conforme – Usurpation</option>
+            <option value="non_applicable">Non applicable – Absent</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Photo de preuve <span class="req">*</span></label>
+          <input type="file" id="photo_preuve" accept="image/*" capture="environment" required />
+        </div>
+        <div class="form-group">
+          <label>Observations</label>
+          <textarea id="observations" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+
     <div class="divider"></div>
     <button type="submit" class="submit-btn" id="submitBtn" onclick="submitForm(event)">✅ Soumettre l'audit</button>
   </div>
+
   <div class="success-box" id="successBox">
     <div class="check-circle">✓</div>
     <h2>Audit soumis avec succès !</h2>
     <p id="successMessage">Les données ont été enregistrées dans Kobo.</p>
     <p style="margin-top:20px;"><a href="" onclick="location.reload();return false;" style="color:#0EA695;font-weight:700;">← Nouvel audit</a></p>
   </div>
+
   <div class="footer">AS-SBC · Audit THIMO Urbain · © 2026</div>
 </div>
+
+<div class="image-modal" id="imageModal">
+  <button type="button" class="close-btn" onclick="closeImageModal()" title="Fermer">×</button>
+  <div class="modal-content">
+    <img id="modalImage" src="" alt="" />
+  </div>
+  <div class="caption-modal" id="modalCaption"></div>
+  <div class="controls">
+    <button type="button" onclick="zoomImage(0.2)">🔍 Zoom +</button>
+    <button type="button" onclick="zoomImage(-0.2)">🔍 Zoom −</button>
+    <button type="button" onclick="rotateImage(-90)">↺ Pivoter −90°</button>
+    <button type="button" onclick="rotateImage(90)">↻ Pivoter +90°</button>
+    <button type="button" onclick="resetImage()">⟲ Réinitialiser</button>
+  </div>
+</div>
+
 <script>
-const API_URL = "https://kobo-relay.onrender.com/submit";
+const API_URL = "https://kobo-relay.onrender.com/submit-audit";
 const PHOTOS_BASE = "https://onesimstat.github.io/thimo-audit/photos/";
+
 let BENEFICIAIRES = {};
 async function loadBeneficiaires() {
   try {
@@ -160,113 +243,42 @@ async function loadBeneficiaires() {
   }
 }
 loadBeneficiaires();
-let benefCount = 0;
+
 function getGPS() {
   if (!navigator.geolocation) { alert("Géolocalisation non supportée"); return; }
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const gps = pos.coords.latitude + " " + pos.coords.longitude + " 0 0";
-      document.getElementById("gps").value = gps;
+      document.getElementById("gps_site").value = gps;
     },
     (err) => alert("Erreur GPS : " + err.message)
   );
 }
+
 document.getElementById("brigade_presente").addEventListener("change", function() {
   const presente = this.value === "oui";
   document.getElementById("motif_absence_group").style.display = presente ? "none" : "block";
   document.getElementById("brigade_details").style.display = presente ? "block" : "none";
   document.getElementById("benef_section").style.display = presente ? "block" : "none";
-  document.getElementById("add_benef_btn").style.display = presente ? "inline-block" : "none";
-  updateEmptyMessage();
+  document.getElementById("benef_block").style.display = presente ? "block" : "none";
 });
-function updateEmptyMessage() {
-  const container = document.getElementById("beneficiaires_container");
-  const msg = document.getElementById("empty_benef_msg");
-  msg.style.display = container.children.length === 0 ? "block" : "none";
-}
-function addBeneficiaire() {
-  benefCount++;
-  const id = benefCount;
-  const container = document.getElementById("beneficiaires_container");
-  const block = document.createElement("div");
-  block.className = "benef-block";
-  block.id = "benef_" + id;
-  block.innerHTML = `
-    <button type="button" class="remove-btn" onclick="removeBeneficiaire(${id})" title="Supprimer">×</button>
-    <div class="form-group">
-      <label>Identifiant du bénéficiaire <span class="req">*</span></label>
-      <input type="text" id="id_benef_${id}" placeholder="Ex: 781437557" oninput="lookupBenef(${id})" required />
-    </div>
-    <div id="info_${id}" style="display:none;background:white;padding:12px;border-radius:6px;margin-bottom:12px;font-size:13px;line-height:1.6;">
-      <div id="info_content_${id}"></div>
-      <div id="photos_${id}" style="margin-top:12px;text-align:center;"></div>
-    </div>
-    <div id="questions_${id}" style="display:none;">
-      <div class="form-group">
-        <label>Statut de présence <span class="req">*</span></label>
-        <select id="statut_presence_${id}" required>
-          <option value="">-- Sélectionnez --</option>
-          <option value="P1">P1 – Présent et identité confirmée</option>
-          <option value="P2">P2 – Absent non justifié</option>
-          <option value="P3">P3 – Non retrouvé / Inconnu</option>
-          <option value="P4">P4 – Contrôle impossible</option>
-          <option value="P5">P5 – Site non concordant / Rotation</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Anomalies constatées <span class="req">*</span></label>
-        <select id="codes_anomalies_${id}" multiple size="6" required style="height:auto;">
-          <option value="A1">A1 – Absence non justifiée</option>
-          <option value="A2">A2 – Identité non concordante</option>
-          <option value="A3">A3 – Bénéficiaire fictif</option>
-          <option value="A4">A4 – Brigade non concordante</option>
-          <option value="A6">A6 – Activité non observée</option>
-          <option value="A7">A7 – Doublon</option>
-          <option value="A8">A8 – Autre anomalie</option>
-        </select>
-        <span class="hint">Maintenez Ctrl pour sélectionner plusieurs</span>
-      </div>
-      <div class="form-group">
-        <label>Face-Matching <span class="req">*</span></label>
-        <select id="face_match_result_${id}" required>
-          <option value="">-- Sélectionnez --</option>
-          <option value="conforme">Conforme – Identité confirmée</option>
-          <option value="douteux">Douteux – Nécessite vérification</option>
-          <option value="usurpation">Non conforme – Usurpation</option>
-          <option value="non_applicable">Non applicable – Absent</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Photo de preuve <span class="req">*</span></label>
-        <input type="file" id="photo_preuve_${id}" accept="image/*" capture="environment" required />
-      </div>
-      <div class="form-group">
-        <label>Observations</label>
-        <textarea id="observations_${id}" rows="2"></textarea>
-      </div>
-    </div>
-  `;
-  container.appendChild(block);
-  updateEmptyMessage();
-}
-function removeBeneficiaire(id) {
-  const block = document.getElementById("benef_" + id);
-  if (block) block.remove();
-  updateEmptyMessage();
-}
-function lookupBenef(id) {
-  const idBenef = document.getElementById("id_benef_" + id).value.trim();
-  const infoDiv = document.getElementById("info_" + id);
-  const infoContent = document.getElementById("info_content_" + id);
-  const photosDiv = document.getElementById("photos_" + id);
-  const questionsDiv = document.getElementById("questions_" + id);
+
+function lookupBenef() {
+  const idBenef = document.getElementById("id_benef").value.trim();
+  const infoDiv = document.getElementById("info_benef");
+  const infoContent = document.getElementById("info_content");
+  const photosDiv = document.getElementById("photos_container");
+  const questionsDiv = document.getElementById("questions_benef");
+
   if (!idBenef) { infoDiv.style.display = "none"; questionsDiv.style.display = "none"; return; }
+
   if (Object.keys(BENEFICIAIRES).length === 0) {
-    infoContent.innerHTML = '<span style=\'color:#f9a825;font-weight:700;\'>⏳ Chargement en cours...</span>';
-    infoDiv.style.display = 'block';
-    questionsDiv.style.display = 'none';
+    infoContent.innerHTML = '<span style="color:#f9a825;font-weight:700;">⏳ Chargement en cours...</span>';
+    infoDiv.style.display = "block";
+    questionsDiv.style.display = "none";
     return;
   }
+
   const benef = BENEFICIAIRES[idBenef];
   if (!benef) {
     infoContent.innerHTML = '<span style="color:#E97132;font-weight:700;">⚠️ Identifiant introuvable</span>';
@@ -275,50 +287,95 @@ function lookupBenef(id) {
     questionsDiv.style.display = "none";
     return;
   }
+
   infoContent.innerHTML = `<strong>👤 ${benef.nom} ${benef.prenoms}</strong><br>🏢 ${benef.prestataire} · 📍 ${benef.commune}<br>📱 ${benef.telephone}`;
+
   let photosHtml = "";
   ["thimo", "recto", "verso"].forEach(p => {
     const url = PHOTOS_BASE + idBenef + "_" + p + ".jpg";
     const label = p === "thimo" ? "THIMO" : p === "recto" ? "Pièce recto" : "Pièce verso";
-    photosHtml += `<div class="photo-ref"><img src="${url}" alt="${label}" onerror="this.style.display='none';" /><div class="caption">${label}</div></div>`;
+    photosHtml += `<div class="photo-ref"><img src="${url}" alt="${label}" onerror="this.style.display='none';" onclick="openImageModal('${url}', '${label} - ${idBenef}')" /><div class="caption">${label}</div></div>`;
   });
   photosDiv.innerHTML = photosHtml;
   infoDiv.style.display = "block";
   questionsDiv.style.display = "block";
 }
+
+let currentScale = 1;
+let currentRotation = 0;
+function openImageModal(src, caption) {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("modalImage");
+  const cap = document.getElementById("modalCaption");
+  currentScale = 1; currentRotation = 0;
+  img.src = src;
+  img.style.transform = "scale(1) rotate(0deg)";
+  cap.textContent = caption || "";
+  modal.classList.add("active");
+  document.body.style.overflow = "hidden";
+}
+function closeImageModal() {
+  document.getElementById("imageModal").classList.remove("active");
+  document.body.style.overflow = "";
+  currentScale = 1; currentRotation = 0;
+}
+function zoomImage(delta) {
+  currentScale = Math.max(0.5, Math.min(5, currentScale + delta));
+  document.getElementById("modalImage").style.transform = `scale(${currentScale}) rotate(${currentRotation}deg)`;
+}
+function rotateImage(deg) {
+  currentRotation = (currentRotation + deg) % 360;
+  document.getElementById("modalImage").style.transform = `scale(${currentScale}) rotate(${currentRotation}deg)`;
+}
+function resetImage() {
+  currentScale = 1; currentRotation = 0;
+  document.getElementById("modalImage").style.transform = "scale(1) rotate(0deg)";
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeImageModal(); });
+document.addEventListener("DOMContentLoaded", function() {
+  const modal = document.getElementById("imageModal");
+  if (modal) modal.addEventListener("click", function(e) { if (e.target === this) closeImageModal(); });
+});
+
 async function submitForm(e) {
   e.preventDefault();
   const submitBtn = document.getElementById("submitBtn");
   submitBtn.disabled = true;
   submitBtn.textContent = "⏳ Envoi en cours...";
+
+  let photoPreuveBase64 = "";
+  const photoInput = document.getElementById("photo_preuve");
+  if (photoInput.files && photoInput.files[0]) {
+    photoPreuveBase64 = await fileToBase64(photoInput.files[0]);
+  }
+
+  const anomaliesSelect = document.getElementById("codes_anomalies");
+  const anomalies = Array.from(anomaliesSelect.selectedOptions).map(o => o.value);
+
   const data = {
+    start: new Date().toISOString(),
+    end: new Date().toISOString(),
+    today: new Date().toISOString().split("T")[0],
+    username: "",
+    deviceid: "",
     nom_agent: document.getElementById("nom_agent").value.trim(),
     date_visite: document.getElementById("date_visite").value,
+    heure_arrivee: document.getElementById("heure_arrivee").value,
     commune: document.getElementById("commune").value,
+    site_name: "",
     brigade_id: document.getElementById("brigade_id").value.trim(),
+    gps_site: document.getElementById("gps_site").value,
     brigade_presente: document.getElementById("brigade_presente").value,
     motif_absence_brigade: document.getElementById("motif_absence_brigade").value.trim(),
-    heure_arrivee: document.getElementById("heure_arrivee").value,
-    effectif_present: document.getElementById("effectif_present").value,
-    effectif_attendu: document.getElementById("effectif_attendu").value,
-    travaux_en_cours: document.getElementById("travaux_en_cours").value,
-    gps: document.getElementById("gps").value,
-    beneficiaires: [],
+    id_benef: document.getElementById("id_benef").value.trim(),
+    statut_presence: document.getElementById("statut_presence").value,
+    codes_anomalies: anomalies.join(" "),
+    detail_anomalie: document.getElementById("detail_anomalie").value.trim(),
+    face_match_result: document.getElementById("face_match_result").value,
+    observations: document.getElementById("observations").value.trim(),
+    photo_preuve: photoPreuveBase64,
   };
-  document.querySelectorAll(".benef-block").forEach(block => {
-    const id = block.id.replace("benef_", "");
-    const idBenef = document.getElementById("id_benef_" + id).value.trim();
-    if (!idBenef) return;
-    const anomaliesSelect = document.getElementById("codes_anomalies_" + id);
-    const anomalies = Array.from(anomaliesSelect.selectedOptions).map(o => o.value);
-    data.beneficiaires.push({
-      id_benef: idBenef,
-      statut_presence: document.getElementById("statut_presence_" + id).value,
-      codes_anomalies: anomalies.join(" "),
-      face_match_result: document.getElementById("face_match_result_" + id).value,
-      observations: document.getElementById("observations_" + id).value.trim(),
-    });
-  });
+
   try {
     const response = await fetch(API_URL, {
       method: "POST",
@@ -331,13 +388,22 @@ async function submitForm(e) {
     }
     document.getElementById("formCard").style.display = "none";
     document.getElementById("successBox").style.display = "block";
-    document.getElementById("successMessage").textContent = "L'audit pour la brigade " + data.brigade_id + " a été enregistré (" + data.beneficiaires.length + " bénéficiaire(s)).";
+    document.getElementById("successMessage").textContent = "L'audit pour la brigade " + data.brigade_id + " a été enregistré.";
     window.scrollTo(0, 0);
   } catch (err) {
     alert("Erreur : " + err.message);
     submitBtn.disabled = false;
     submitBtn.textContent = "✅ Soumettre l'audit";
   }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 </script>
 </body>
